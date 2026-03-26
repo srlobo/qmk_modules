@@ -198,10 +198,31 @@ report_mouse_t pointing_device_driver_get_report(report_mouse_t mouse_report) {
         return mouse_report;
     }
 
+    static uint16_t activation_timer = 0;
+    static uint16_t last_motion_time = 0;
+    static bool     timer_started    = false;
+    static bool     motion_active    = false;
+
     if (has_motion) {
-        has_motion = 0;
-        paw3804ek_read_motion(&mouse_report);
+        has_motion       = 0;
+        last_motion_time = timer_read();
+
+        if (!motion_active) {
+            if (!timer_started) {
+                activation_timer = timer_read();
+                timer_started    = true;
+            } else if (timer_elapsed(activation_timer) >= NAVIGATOR_ACTIVATION_DELAY_MS) {
+                motion_active = true;
+            }
+        }
+        if (motion_active) {
+            paw3804ek_read_motion(&mouse_report);
+        }
+    } else if (timer_started && timer_elapsed(last_motion_time) >= NAVIGATOR_ACTIVATION_DELAY_MS) {
+        timer_started = false;
+        motion_active = false;
     }
+
     return mouse_report;
 }
 
